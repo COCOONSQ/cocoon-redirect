@@ -91,8 +91,8 @@
 </div>
 
 <script>
-// 读取同仓库里的最新 tunnel 地址（GitHub Pages 自动部署，无 Gist raw 缓存问题）
-const TUNNEL_URL_TXT = 'tunnel_url.txt?t=' + Date.now();
+// 读取 GitHub Gist 中存放的最新 tunnel 地址
+const GIST_RAW = 'https://gist.githubusercontent.com/COCOONSQ/0817ffdb36907b2b584b41eb59c8d156/raw/tunnel_url.txt';
 
 const statusEl = document.getElementById('status');
 const spinner = document.getElementById('spinner');
@@ -134,7 +134,7 @@ function fetchWithTimeout(url, ms) {
   });
 }
 
-fetchWithTimeout(TUNNEL_URL_TXT, 8000).then(function(r) {
+fetchWithTimeout(GIST_RAW, 8000).then(function(r) {
   return r.text();
 }).then(function(text) {
   doRedirect(text);
