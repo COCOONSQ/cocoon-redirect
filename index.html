@@ -133,7 +133,11 @@
     word-break: break-all;
     color: #6d4c41;
     display: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .35s ease, transform .35s ease;
   }
+  .url-box.show { opacity: 1; transform: translateY(0); }
   .manual-btn {
     display: none;
     margin-top: 18px;
@@ -145,13 +149,39 @@
     font-size: 14px;
     cursor: pointer;
     text-decoration: none;
-    display: inline-block;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .35s ease, transform .35s ease;
   }
+  .manual-btn.show { opacity: 1; transform: translateY(0); }
   .footer {
     margin-top: 18px;
     font-size: 12px;
     color: #a1887f;
   }
+  .progress-bar {
+    width: 220px;
+    height: 4px;
+    background: #efe5e1;
+    border-radius: 2px;
+    margin: 18px auto 0;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-bar.active { display: block; }
+  .progress-fill {
+    width: 0%; height: 100%;
+    background: linear-gradient(90deg, #b14438, #d86c5f);
+    border-radius: 2px;
+    animation: progress 2.2s ease-in-out forwards;
+  }
+  @keyframes progress {
+    0% { width: 0%; }
+    40% { width: 60%; }
+    100% { width: 92%; }
+  }
+  .fade-in { animation: fadeIn .45s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
   @media (max-width: 480px) {
     .card { padding: 34px 24px; }
@@ -182,7 +212,8 @@
     <!-- 加载 / 跳转 -->
     <div id="loadingBox" class="loading">
       <div class="spinner"></div>
-      <div class="status" id="status">正在连接实时数据...</div>
+      <div class="status fade-in" id="status">正在连接实时数据...</div>
+      <div class="progress-bar" id="progressBar"><div class="progress-fill"></div></div>
       <div class="url-box" id="urlBox"></div>
       <a class="manual-btn" id="manualBtn" href="#" target="_blank">手动打开看板</a>
       <div class="footer">地址由服务端自动维护，无需手动更新</div>
@@ -199,7 +230,10 @@ const loadingBox = document.getElementById('loadingBox');
 const statusEl = document.getElementById('status');
 const urlBox = document.getElementById('urlBox');
 const manualBtn = document.getElementById('manualBtn');
+const progressBar = document.getElementById('progressBar');
 const loginError = document.getElementById('loginError');
+
+let fallbackTimer = null;
 
 // 已登录且 token 未过期则直接进入加载态
 const saved = localStorage.getItem(TOKEN_KEY);
@@ -216,11 +250,19 @@ if (saved) {
 function showLoading() {
   loginForm.classList.remove('active');
   loadingBox.classList.add('active');
+  if (progressBar) progressBar.classList.add('active');
 }
 
 function showError(msg) {
   loadingBox.querySelector('.spinner').style.display = 'none';
+  if (progressBar) progressBar.style.display = 'none';
   statusEl.innerHTML = '<span style="color:#c62828">' + msg + '</span>';
+}
+
+function showFallback(url, base) {
+  if (urlBox) { urlBox.style.display = 'block'; urlBox.textContent = base; setTimeout(() => urlBox.classList.add('show'), 10); }
+  if (manualBtn) { manualBtn.style.display = 'inline-block'; manualBtn.href = url; setTimeout(() => manualBtn.classList.add('show'), 10); }
+  statusEl.innerHTML = '<span style="color:#8d6e63">自动跳转似乎被拦截，请手动打开</span>';
 }
 
 function fetchWithTimeout(url, ms) {
@@ -298,12 +340,20 @@ function startRedirect(token, tunnelUrl) {
   }
   const base = tunnelUrl.replace(/\/$/, '');
   const url = base + '/login?token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('/progress');
+
   statusEl.innerHTML = '<span style="color:#2e7d32">身份验证成功，正在打开看板...</span>';
-  urlBox.style.display = 'block';
-  urlBox.textContent = base;
-  manualBtn.style.display = 'inline-block';
-  manualBtn.href = url;
-  setTimeout(function() { window.location.href = url; }, 600);
+  showLoading();
+
+  // 800ms 后执行页面替换（不保留当前页在历史记录中）
+  setTimeout(function() {
+    window.location.replace(url);
+  }, 800);
+
+  // 3.5s 后若页面仍在，给出手动兜底
+  if (fallbackTimer) clearTimeout(fallbackTimer);
+  fallbackTimer = setTimeout(function() {
+    showFallback(url, base);
+  }, 3500);
 }
 
 // 回车提交
