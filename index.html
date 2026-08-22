@@ -3,128 +3,230 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>可可尼看板 - 正在连接...</title>
+<title>可可尼看板 · 登录</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
+  html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4ecf7 100%);
+    background: linear-gradient(135deg, #f8f4f2 0%, #f1e8e4 100%);
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #2c3e50;
+    color: #3e2723;
+  }
+  .wrap {
+    max-width: 420px;
+    width: 92%;
   }
   .card {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-    padding: 40px 48px;
-    max-width: 480px;
-    width: 90%;
+    background: rgba(255,255,255,0.96);
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(60,20,10,0.10);
+    padding: 40px 34px;
     text-align: center;
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.8);
   }
-  .logo {
+  .brand {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 18px;
+    background: linear-gradient(135deg, #b14438 0%, #c0392b 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 28px;
+    box-shadow: 0 6px 16px rgba(176,68,56,0.28);
+  }
+  h1 {
     font-size: 22px;
     font-weight: 700;
-    color: #c0392b;
-    margin-bottom: 8px;
+    color: #4a2c28;
+    margin-bottom: 6px;
   }
-  .subtitle {
-    font-size: 14px;
-    color: #7f8c8d;
+  .tagline {
+    font-size: 13px;
+    color: #8d6e63;
     margin-bottom: 28px;
   }
+
+  .form { display: none; }
+  .form.active { display: block; }
+  .input-group {
+    text-align: left;
+    margin-bottom: 16px;
+  }
+  .input-group label {
+    display: block;
+    font-size: 13px;
+    color: #6d4c41;
+    margin-bottom: 6px;
+  }
+  .input-group input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #e0d6d2;
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff;
+    color: #3e2723;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .input-group input:focus {
+    outline: none;
+    border-color: #b14438;
+    box-shadow: 0 0 0 3px rgba(177,68,56,0.12);
+  }
+  .btn {
+    width: 100%;
+    padding: 13px 16px;
+    margin-top: 8px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #b14438 0%, #c0392b 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(176,68,56,0.22);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  .error {
+    margin-top: 14px;
+    color: #c62828;
+    font-size: 13px;
+    min-height: 18px;
+  }
+
+  .loading { display: none; }
+  .loading.active { display: block; }
   .spinner {
-    width: 44px;
-    height: 44px;
-    border: 4px solid #e1e8f0;
-    border-top-color: #c0392b;
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3e9e6;
+    border-top-color: #b14438;
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 20px;
+    animation: spin 0.85s linear infinite;
+    margin: 0 auto 22px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .status {
     font-size: 15px;
+    color: #5d4037;
     line-height: 1.6;
-    min-height: 24px;
   }
   .url-box {
     margin-top: 18px;
-    padding: 12px 14px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 12px;
+    background: #faf6f4;
+    border: 1px solid #efe5e1;
+    border-radius: 10px;
+    font-size: 12px;
     word-break: break-all;
-    color: #475569;
+    color: #6d4c41;
     display: none;
   }
   .manual-btn {
     display: none;
     margin-top: 18px;
-    padding: 12px 24px;
-    background: #c0392b;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
+    padding: 11px 22px;
+    background: #fff;
+    color: #b14438;
+    border: 1px solid #b14438;
+    border-radius: 10px;
+    font-size: 14px;
     cursor: pointer;
     text-decoration: none;
     display: inline-block;
   }
-  .err { color: #e74c3c; }
-  .ok { color: #27ae60; }
-  .small { font-size: 12px; color: #95a5a6; margin-top: 20px; }
+  .footer {
+    margin-top: 18px;
+    font-size: 12px;
+    color: #a1887f;
+  }
+
+  @media (max-width: 480px) {
+    .card { padding: 34px 24px; }
+    h1 { font-size: 20px; }
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">可可尼上新看板</div>
-  <div class="subtitle">正在为您连接到实时数据...</div>
-  <div class="spinner" id="spinner"></div>
-  <div class="status" id="status">正在获取最新访问地址...</div>
-  <div class="url-box" id="urlBox"></div>
-  <a class="manual-btn" id="manualBtn" href="#" target="_blank">手动打开看板</a>
-  <div class="small">地址由看板服务端自动维护，无需手动更新</div>
+<div class="wrap">
+  <div class="card">
+    <!-- 登录表单 -->
+    <div id="loginForm" class="form active">
+      <div class="brand">🛒</div>
+      <h1>可可尼上新看板</h1>
+      <div class="tagline">COCOON · 产品上市数据大屏</div>
+      <div class="input-group">
+        <label for="username">账号</label>
+        <input id="username" type="text" placeholder="请输入账号" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <label for="password">密码</label>
+        <input id="password" type="password" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <button class="btn" id="loginBtn" onclick="doLogin()">登 录</button>
+      <div class="error" id="loginError"></div>
+    </div>
+
+    <!-- 加载 / 跳转 -->
+    <div id="loadingBox" class="loading">
+      <div class="spinner"></div>
+      <div class="status" id="status">正在连接实时数据...</div>
+      <div class="url-box" id="urlBox"></div>
+      <a class="manual-btn" id="manualBtn" href="#" target="_blank">手动打开看板</a>
+      <div class="footer">地址由服务端自动维护，无需手动更新</div>
+    </div>
+  </div>
 </div>
 
 <script>
-// 读取同仓库里的最新 tunnel 地址（GitHub Pages 自动部署，无 Gist raw 缓存问题）
 const TUNNEL_URL_TXT = 'tunnel_url.txt?t=' + Date.now();
+const TOKEN_KEY = 'cocoon_board_token';
 
+const loginForm = document.getElementById('loginForm');
+const loadingBox = document.getElementById('loadingBox');
 const statusEl = document.getElementById('status');
-const spinner = document.getElementById('spinner');
 const urlBox = document.getElementById('urlBox');
 const manualBtn = document.getElementById('manualBtn');
+const loginError = document.getElementById('loginError');
 
-function showError(msg) {
-  spinner.style.display = 'none';
-  statusEl.innerHTML = '<span class="err">' + msg + '</span>';
+// 已登录且 token 未过期则直接进入加载态
+const saved = localStorage.getItem(TOKEN_KEY);
+if (saved) {
+  try {
+    const s = JSON.parse(saved);
+    if (s.token && s.expires && Date.now() < s.expires) {
+      showLoading();
+      startRedirect(s.token);
+    }
+  } catch (e) { localStorage.removeItem(TOKEN_KEY); }
 }
 
-function doRedirect(url) {
-  // 清理地址（去除首尾空白、换行）
-  url = url.trim();
-  if (!url || url === 'INIT' || !/^https?:\/\//.test(url)) {
-    showError('看板地址暂不可用，请稍后重试或联系管理员');
-    return;
-  }
-  spinner.style.display = 'none';
-  statusEl.innerHTML = '<span class="ok">已连接到看板，正在打开...</span>';
-  urlBox.style.display = 'block';
-  urlBox.textContent = url;
-  manualBtn.style.display = 'inline-block';
-  manualBtn.href = url;
-  // 自动跳转
-  setTimeout(function() { window.location.href = url; }, 800);
+function showLoading() {
+  loginForm.classList.remove('active');
+  loadingBox.classList.add('active');
+}
+
+function showError(msg) {
+  loadingBox.querySelector('.spinner').style.display = 'none';
+  statusEl.innerHTML = '<span style="color:#c62828">' + msg + '</span>';
 }
 
 function fetchWithTimeout(url, ms) {
   return new Promise(function(resolve, reject) {
     const timer = setTimeout(function() { reject(new Error('timeout')); }, ms);
-    fetch(url, { cache: 'no-store' }).then(function(r) {
+    fetch(url, { cache: 'no-store', mode: 'no-cors' }).then(function(r) {
       clearTimeout(timer);
       resolve(r);
     }).catch(function(e) {
@@ -134,12 +236,81 @@ function fetchWithTimeout(url, ms) {
   });
 }
 
-fetchWithTimeout(TUNNEL_URL_TXT, 8000).then(function(r) {
-  return r.text();
-}).then(function(text) {
-  doRedirect(text);
-}).catch(function(e) {
-  showError('无法获取看板地址（网络问题），请刷新页面重试');
+async function doLogin() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  if (!username || !password) {
+    loginError.textContent = '请输入账号和密码';
+    return;
+  }
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '登录中...';
+  loginError.textContent = '';
+
+  try {
+    // 1. 获取当前 tunnel 地址
+    statusEl.textContent = '正在获取看板地址...';
+    showLoading();
+    const r = await fetch(TUNNEL_URL_TXT, { cache: 'no-store' });
+    const tunnelUrl = (await r.text()).trim();
+    if (!tunnelUrl || tunnelUrl === 'INIT' || !/^https?:\/\//.test(tunnelUrl)) {
+      throw new Error('看板地址暂不可用');
+    }
+
+    // 2. 到看板服务端验证账号密码
+    statusEl.textContent = '正在验证身份...';
+    const authResp = await fetch(tunnelUrl.replace(/\/$/, '') + '/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const authData = await authResp.json();
+    if (!authData.ok || !authData.token) {
+      throw new Error(authData.error || '账号或密码错误');
+    }
+
+    // 3. 保存 token（24 小时有效）
+    localStorage.setItem(TOKEN_KEY, JSON.stringify({
+      token: authData.token,
+      expires: Date.now() + 24 * 60 * 60 * 1000,
+      role: authData.role || 'user'
+    }));
+
+    // 4. 跳转：先经过 /login 设置 cookie，再进看板
+    startRedirect(authData.token, tunnelUrl);
+  } catch (e) {
+    loginForm.classList.add('active');
+    loadingBox.classList.remove('active');
+    loginError.textContent = e.message || '登录失败，请稍后重试';
+    btn.disabled = false;
+    btn.textContent = '登 录';
+  }
+}
+
+function startRedirect(token, tunnelUrl) {
+  if (!tunnelUrl) {
+    fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
+      .then(r => r.text())
+      .then(url => startRedirect(token, url.trim()))
+      .catch(() => showError('无法获取看板地址，请刷新重试'));
+    return;
+  }
+  const base = tunnelUrl.replace(/\/$/, '');
+  const url = base + '/login?token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('/progress');
+  statusEl.innerHTML = '<span style="color:#2e7d32">身份验证成功，正在打开看板...</span>';
+  urlBox.style.display = 'block';
+  urlBox.textContent = base;
+  manualBtn.style.display = 'inline-block';
+  manualBtn.href = url;
+  setTimeout(function() { window.location.href = url; }, 600);
+}
+
+// 回车提交
+['username','password'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
 });
 </script>
 </body>
