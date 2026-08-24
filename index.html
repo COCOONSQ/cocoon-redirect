@@ -289,17 +289,46 @@ function showFallback(url, base) {
   statusEl.innerHTML = '<span style="color:#8d6e63">自动跳转似乎被拦截，请手动打开</span>';
 }
 
-function fetchWithTimeout(url, ms) {
-  return new Promise(function(resolve, reject) {
-    const timer = setTimeout(function() { reject(new Error('timeout')); }, ms);
-    fetch(url, { cache: 'no-store', mode: 'no-cors' }).then(function(r) {
+function fetchWithTimeout(url, init, timeoutMs) {
+  // 通用 fetch 包装：传入 init 可指定 method/headers/body；ms 内未响应则 abort 并 reject('请求超时（>Xs）')。
+  // 关键修复：doLogin 里的 fetch 一旦挂起会让用户永远卡在"正在获取看板地址..."。
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(function() {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  return fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: controller.signal }))
+    .then(function(r) { clearTimeout(timer); return r; })
+    .catch(function(e) {
       clearTimeout(timer);
-      resolve(r);
-    }).catch(function(e) {
-      clearTimeout(timer);
-      reject(e);
+      if (timedOut || (e && e.name === 'AbortError')) {
+        throw new Error('请求超时（>' + Math.round(timeoutMs / 1000) + '秒），请检查网络后重试');
+      }
+      throw e;
     });
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
   });
+}
+
+function showErrorAndRetry(msg) {
+  // 关键修复：错误时**不**回到登录表单（避免用户重新输入密码），而是
+  // 保留 loadingBox 状态显示具体错误和重试按钮。所有错误都用 escapeHtml 防 XSS。
+  const spinner = loadingBox.querySelector('.spinner');
+  if (spinner) spinner.style.display = 'none';
+  if (progressBar) progressBar.style.display = 'none';
+  statusEl.innerHTML = '<span style="color:#c62828">' + escapeHtml(msg) + '</span>';
+  const btn = document.getElementById('reopenBtn');
+  if (btn) {
+    btn.textContent = '重新登录';
+    btn.onclick = function() { location.reload(); };
+    btn.style.display = 'inline-block';
+    btn.classList.add('show');
+  }
 }
 
 async function doLogin() {
@@ -314,45 +343,61 @@ async function doLogin() {
   btn.textContent = '登录中...';
   loginError.textContent = '';
 
+  // 直接进入 loading 状态：所有错误和重试都显示在 loadingBox，不再回到 loginForm
+  showLoading();
+  statusEl.textContent = '正在获取看板地址...';
+
+  // 1. 获取 tunnel 地址（8 秒超时）
+  let tunnelUrl;
   try {
-    // 1. 获取当前 tunnel 地址
-    statusEl.textContent = '正在获取看板地址...';
-    showLoading();
-    const r = await fetch(TUNNEL_URL_TXT, { cache: 'no-store' });
-    const tunnelUrl = (await r.text()).trim();
-    if (!tunnelUrl || tunnelUrl === 'INIT' || !/^https?:\/\//.test(tunnelUrl)) {
-      throw new Error('看板地址暂不可用');
-    }
-
-    // 2. 到看板服务端验证账号密码
-    statusEl.textContent = '正在验证身份...';
-    const authResp = await fetch(tunnelUrl.replace(/\/$/, '') + '/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    const authData = await authResp.json();
-    if (!authData.ok || !authData.token) {
-      throw new Error(authData.error || '账号或密码错误');
-    }
-
-    // 3. 保存 token（24 小时有效）
-    localStorage.setItem(TOKEN_KEY, JSON.stringify({
-      token: authData.token,
-      expires: Date.now() + 24 * 60 * 60 * 1000,
-      role: authData.role || 'user'
-    }));
-
-    // 4. 打开看板：在新标签页打开，保留本固定入口页
-    currentToken = authData.token;
-    openBoard(authData.token, tunnelUrl);
+    const r = await fetchWithTimeout(TUNNEL_URL_TXT, null, 8000);
+    tunnelUrl = (await r.text()).trim();
   } catch (e) {
-    loginForm.classList.add('active');
-    loadingBox.classList.remove('active');
-    loginError.textContent = e.message || '登录失败，请稍后重试';
-    btn.disabled = false;
-    btn.textContent = '登 录';
+    showErrorAndRetry('获取看板地址失败：' + (e.message || '网络错误'));
+    btn.disabled = false; btn.textContent = '登 录';
+    return;
   }
+  if (!tunnelUrl || tunnelUrl === 'INIT' || !/^https?:\/\//.test(tunnelUrl)) {
+    showErrorAndRetry('看板地址暂不可用，请稍后重试');
+    btn.disabled = false; btn.textContent = '登 录';
+    return;
+  }
+
+  // 2. 到看板服务端验证账号密码（15 秒超时）
+  statusEl.textContent = '正在验证身份...';
+  let authData;
+  try {
+    const authResp = await fetchWithTimeout(
+      tunnelUrl.replace(/\/$/, '') + '/api/auth',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      },
+      15000
+    );
+    authData = await authResp.json();
+  } catch (e) {
+    showErrorAndRetry('验证身份失败：' + (e.message || '网络错误'));
+    btn.disabled = false; btn.textContent = '登 录';
+    return;
+  }
+  if (!authData.ok || !authData.token) {
+    showErrorAndRetry(authData.error || '账号或密码错误');
+    btn.disabled = false; btn.textContent = '登 录';
+    return;
+  }
+
+  // 3. 保存 token（24 小时有效）
+  localStorage.setItem(TOKEN_KEY, JSON.stringify({
+    token: authData.token,
+    expires: Date.now() + 24 * 60 * 60 * 1000,
+    role: authData.role || 'user'
+  }));
+
+  // 4. 打开看板：在新标签页打开，保留本固定入口页
+  currentToken = authData.token;
+  openBoard(authData.token, tunnelUrl);
 }
 
 function openBoard(token, tunnelUrl) {
