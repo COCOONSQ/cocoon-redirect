@@ -370,27 +370,16 @@ function openBoard(token, tunnelUrl) {
   currentTunnelBase = base;
   currentToken = token;
 
-  statusEl.innerHTML = '<span style="color:#2e7d32">正在打开看板...</span>';
+  statusEl.innerHTML = '<span style="color:#2e7d32">登录成功，正在进入看板...</span>';
   showLoading();
 
-  // 在登录按钮点击的用户手势有效期内立即弹出新标签页（延时太长会被浏览器拦截）
-  const opened = window.open(url, '_blank');
-
-  if (opened) {
-    statusEl.innerHTML = '<span style="color:#2e7d32">看板已在新标签页打开</span><br><small style="color:#8d6e63">临时地址会随服务端重启而变化，请勿收藏或刷新它；<br>若新页面失效，请回到本页点击"重新打开看板"</small>';
-    if (progressBar) progressBar.style.display = 'none';
-    const spinner = loadingBox.querySelector('.spinner');
-    if (spinner) spinner.style.display = 'none';
-    const btn = document.getElementById('reopenBtn');
-    if (btn) { btn.textContent = '重新打开看板'; btn.style.display = 'inline-block'; setTimeout(() => btn.classList.add('show'), 10); }
-  } else {
-    // 被浏览器拦截时走兜底
-    showFallback(url, base);
-  }
+  // 关键修复：直接在当前标签跳转，避免 window.open 被浏览器拦截导致卡在登录页
+  // /login?token=... 会在服务端写入 HttpOnly+Secure cookie，再 302 到 /progress
+  window.location.href = url;
 }
 
 function reopenBoard() {
-  if (!currentToken) {
+  if (!currentToken || !currentTunnelBase) {
     location.reload();
     return;
   }
