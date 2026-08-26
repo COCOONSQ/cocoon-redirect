@@ -260,20 +260,37 @@ if (saved) {
     const s = JSON.parse(saved);
     if (s.token && s.expires && Date.now() < s.expires) {
       currentToken = s.token;
+      // 已登录：打开固定入口页后自动进入看板，无需手动点击按钮
       showLoading();
-      statusEl.innerHTML = '<span style="color:#2e7d32">已登录</span><br><small style="color:#8d6e63">请点击下方按钮打开看板</small>';
-      if (progressBar) progressBar.style.display = 'none';
-      const spinner = loadingBox.querySelector('.spinner');
-      if (spinner) spinner.style.display = 'none';
-      const btn = document.getElementById('reopenBtn');
-      if (btn) { btn.textContent = '打开看板'; btn.style.display = 'inline-block'; setTimeout(() => btn.classList.add('show'), 10); }
-      // 预拉取最新看板地址，供「打开看板」按钮直接使用（隧道可能已重连换地址）
-      fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
-        .then(r => r.text())
-        .then(u => { const s = (u || '').trim(); if (s && s !== 'INIT' && /^https?:\/\//.test(s)) currentTunnelBase = s; })
-        .catch(() => {});
+      statusEl.innerHTML = '<span style="color:#2e7d32">已登录</span><br><small style="color:#8d6e63">正在进入看板...</small>';
+      autoEnterBoard(s.token);
     }
   } catch (e) { localStorage.removeItem(TOKEN_KEY); }
+}
+
+function autoEnterBoard(token) {
+  // 已登录用户打开固定入口页时自动跳转到看板：openBoard 内部用 window.location.href 同步导航，不会被浏览器拦截
+  fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
+    .then(r => r.text())
+    .then(u => {
+      const url = (u || '').trim();
+      if (!url || url === 'INIT' || !/^https?:\/\//.test(url)) throw new Error('看板地址暂不可用');
+      openBoard(token, url);
+    })
+    .catch(() => {
+      // 拉取隧道地址失败才退化为手动按钮
+      const spinner = loadingBox.querySelector('.spinner');
+      if (spinner) spinner.style.display = 'none';
+      if (progressBar) progressBar.style.display = 'none';
+      statusEl.innerHTML = '<span style="color:#c62828">自动进入失败，请手动打开</span>';
+      const btn = document.getElementById('reopenBtn');
+      if (btn) {
+        btn.textContent = '打开看板';
+        btn.onclick = function() { reopenBoard(); };
+        btn.style.display = 'inline-block';
+        setTimeout(() => btn.classList.add('show'), 10);
+      }
+    });
 }
 
 function showLoading() {
