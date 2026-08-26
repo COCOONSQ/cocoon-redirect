@@ -267,6 +267,11 @@ if (saved) {
       if (spinner) spinner.style.display = 'none';
       const btn = document.getElementById('reopenBtn');
       if (btn) { btn.textContent = '打开看板'; btn.style.display = 'inline-block'; setTimeout(() => btn.classList.add('show'), 10); }
+      // 预拉取最新看板地址，供「打开看板」按钮直接使用（隧道可能已重连换地址）
+      fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
+        .then(r => r.text())
+        .then(u => { const s = (u || '').trim(); if (s && s !== 'INIT' && /^https?:\/\//.test(s)) currentTunnelBase = s; })
+        .catch(() => {});
     }
   } catch (e) { localStorage.removeItem(TOKEN_KEY); }
 }
@@ -424,13 +429,20 @@ function openBoard(token, tunnelUrl) {
 }
 
 function reopenBoard() {
-  if (!currentToken || !currentTunnelBase) {
-    location.reload();
-    return;
-  }
+  if (!currentToken) { location.reload(); return; }
   const btn = document.getElementById('reopenBtn');
   if (btn) { btn.classList.remove('show'); }
-  openBoard(currentToken, currentTunnelBase);
+  statusEl.innerHTML = '<span style="color:#2e7d32">正在打开看板...</span>';
+  showLoading();
+  // 始终重新拉取最新地址（隧道可能已重连换地址），避免用到过期地址导致打不开
+  fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
+    .then(r => r.text())
+    .then(url => {
+      const u = (url || '').trim();
+      if (!u || u === 'INIT' || !/^https?:\/\//.test(u)) throw new Error('看板地址暂不可用');
+      openBoard(currentToken, u);
+    })
+    .catch(() => showError('无法获取看板地址，请刷新重试'));
 }
 
 // 回车提交
