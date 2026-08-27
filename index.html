@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>可可尼看板 · 登录</title>
+<title>可可尼看板 · 入口</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -53,61 +53,6 @@
     margin-bottom: 28px;
   }
 
-  .form { display: none; }
-  .form.active { display: block; }
-  .input-group {
-    text-align: left;
-    margin-bottom: 16px;
-  }
-  .input-group label {
-    display: block;
-    font-size: 13px;
-    color: #6d4c41;
-    margin-bottom: 6px;
-  }
-  .input-group input {
-    width: 100%;
-    padding: 12px 14px;
-    border: 1px solid #e0d6d2;
-    border-radius: 10px;
-    font-size: 15px;
-    background: #fff;
-    color: #3e2723;
-    transition: border-color .2s, box-shadow .2s;
-  }
-  .input-group input:focus {
-    outline: none;
-    border-color: #b14438;
-    box-shadow: 0 0 0 3px rgba(177,68,56,0.12);
-  }
-  .btn {
-    width: 100%;
-    padding: 13px 16px;
-    margin-top: 8px;
-    border: none;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #b14438 0%, #c0392b 100%);
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 6px 16px rgba(176,68,56,0.22);
-    transition: transform .15s, box-shadow .15s;
-  }
-  .btn:active { transform: translateY(1px); }
-  .btn:disabled {
-    opacity: 0.7;
-    cursor: wait;
-  }
-  .error {
-    margin-top: 14px;
-    color: #c62828;
-    font-size: 13px;
-    min-height: 18px;
-  }
-
-  .loading { display: none; }
-  .loading.active { display: block; }
   .spinner {
     width: 50px;
     height: 50px;
@@ -154,7 +99,7 @@
     transition: opacity .35s ease, transform .35s ease;
   }
   .manual-btn.show { opacity: 1; transform: translateY(0); }
-  .reopen-btn {
+  .retry-btn {
     display: none;
     margin-top: 18px;
     padding: 11px 22px;
@@ -168,7 +113,7 @@
     transform: translateY(8px);
     transition: opacity .35s ease, transform .35s ease;
   }
-  .reopen-btn.show { opacity: 1; transform: translateY(0); }
+  .retry-btn.show { opacity: 1; transform: translateY(0); }
   .footer {
     margin-top: 18px;
     font-size: 12px;
@@ -181,9 +126,7 @@
     border-radius: 2px;
     margin: 18px auto 0;
     overflow: hidden;
-    display: none;
   }
-  .progress-bar.active { display: block; }
   .progress-fill {
     width: 0%; height: 100%;
     background: linear-gradient(90deg, #b14438, #d86c5f);
@@ -207,31 +150,17 @@
 <body>
 <div class="wrap">
   <div class="card">
-    <!-- 登录表单 -->
-    <div id="loginForm" class="form active">
-      <div class="brand">🛒</div>
-      <h1>可可尼上新看板</h1>
-      <div class="tagline">COCOON · 产品上市数据大屏</div>
-      <div class="input-group">
-        <label for="username">账号</label>
-        <input id="username" type="text" placeholder="请输入账号" autocomplete="username">
-      </div>
-      <div class="input-group">
-        <label for="password">密码</label>
-        <input id="password" type="password" placeholder="请输入密码" autocomplete="current-password">
-      </div>
-      <button class="btn" id="loginBtn" onclick="doLogin()">登 录</button>
-      <div class="error" id="loginError"></div>
-    </div>
+    <div class="brand">🛒</div>
+    <h1>可可尼上新看板</h1>
+    <div class="tagline">COCOON · 产品上市数据大屏</div>
 
-    <!-- 加载 / 跳转 -->
-    <div id="loadingBox" class="loading">
+    <div class="loading" id="loadingBox">
       <div class="spinner"></div>
       <div class="status fade-in" id="status">正在连接实时数据...</div>
       <div class="progress-bar" id="progressBar"><div class="progress-fill"></div></div>
       <div class="url-box" id="urlBox"></div>
       <a class="manual-btn" id="manualBtn" href="#" target="_blank">手动打开看板</a>
-      <button class="reopen-btn" id="reopenBtn" onclick="reopenBoard()">重新打开看板</button>
+      <button class="retry-btn" id="retryBtn" onclick="enterBoard()">重 试</button>
       <div class="footer">固定入口页不会失效；实时看板地址由服务端自动维护，请勿收藏/刷新临时地址</div>
     </div>
   </div>
@@ -239,81 +168,30 @@
 
 <script>
 const TUNNEL_URL_TXT = 'tunnel_url.txt?t=' + Date.now();
-const TOKEN_KEY = 'cocoon_board_token';
-
-const loginForm = document.getElementById('loginForm');
-const loadingBox = document.getElementById('loadingBox');
 const statusEl = document.getElementById('status');
 const urlBox = document.getElementById('urlBox');
 const manualBtn = document.getElementById('manualBtn');
 const progressBar = document.getElementById('progressBar');
-const loginError = document.getElementById('loginError');
-
-let fallbackTimer = null;
-
-// 已登录且 token 未过期则显示"打开看板"按钮（不自动弹窗，避免被浏览器拦截）
-let currentToken = null;
-let currentTunnelBase = null;
-const saved = localStorage.getItem(TOKEN_KEY);
-if (saved) {
-  try {
-    const s = JSON.parse(saved);
-    if (s.token && s.expires && Date.now() < s.expires) {
-      currentToken = s.token;
-      // 已登录：打开固定入口页后自动进入看板，无需手动点击按钮
-      showLoading();
-      statusEl.innerHTML = '<span style="color:#2e7d32">已登录</span><br><small style="color:#8d6e63">正在进入看板...</small>';
-      autoEnterBoard(s.token);
-    }
-  } catch (e) { localStorage.removeItem(TOKEN_KEY); }
-}
-
-function autoEnterBoard(token) {
-  // 已登录用户打开固定入口页时自动跳转到看板：openBoard 内部用 window.location.href 同步导航，不会被浏览器拦截
-  fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
-    .then(r => r.text())
-    .then(u => {
-      const url = (u || '').trim();
-      if (!url || url === 'INIT' || !/^https?:\/\//.test(url)) throw new Error('看板地址暂不可用');
-      openBoard(token, url);
-    })
-    .catch(() => {
-      // 拉取隧道地址失败才退化为手动按钮
-      const spinner = loadingBox.querySelector('.spinner');
-      if (spinner) spinner.style.display = 'none';
-      if (progressBar) progressBar.style.display = 'none';
-      statusEl.innerHTML = '<span style="color:#c62828">自动进入失败，请手动打开</span>';
-      const btn = document.getElementById('reopenBtn');
-      if (btn) {
-        btn.textContent = '打开看板';
-        btn.onclick = function() { reopenBoard(); };
-        btn.style.display = 'inline-block';
-        setTimeout(() => btn.classList.add('show'), 10);
-      }
-    });
-}
-
-function showLoading() {
-  loginForm.classList.remove('active');
-  loadingBox.classList.add('active');
-  if (progressBar) progressBar.classList.add('active');
-}
+const retryBtn = document.getElementById('retryBtn');
 
 function showError(msg) {
-  loadingBox.querySelector('.spinner').style.display = 'none';
+  const spinner = document.querySelector('.spinner');
+  if (spinner) spinner.style.display = 'none';
   if (progressBar) progressBar.style.display = 'none';
   statusEl.innerHTML = '<span style="color:#c62828">' + msg + '</span>';
+  if (retryBtn) {
+    retryBtn.style.display = 'inline-block';
+    setTimeout(() => retryBtn.classList.add('show'), 10);
+  }
 }
 
 function showFallback(url, base) {
   if (urlBox) { urlBox.style.display = 'block'; urlBox.textContent = base; setTimeout(() => urlBox.classList.add('show'), 10); }
   if (manualBtn) { manualBtn.style.display = 'inline-block'; manualBtn.href = url; setTimeout(() => manualBtn.classList.add('show'), 10); }
-  statusEl.innerHTML = '<span style="color:#8d6e63">自动跳转似乎被拦截，请手动打开</span>';
+  statusEl.innerHTML = '<span style="color:#8d6e63">自动跳转失败，请手动打开</span>';
 }
 
 function fetchWithTimeout(url, init, timeoutMs) {
-  // 通用 fetch 包装：传入 init 可指定 method/headers/body；ms 内未响应则 abort 并 reject('请求超时（>Xs）')。
-  // 关键修复：doLogin 里的 fetch 一旦挂起会让用户永远卡在"正在获取看板地址..."。
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(function() {
@@ -331,143 +209,20 @@ function fetchWithTimeout(url, init, timeoutMs) {
     });
 }
 
-function escapeHtml(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
-    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
-  });
-}
-
-function showErrorAndRetry(msg) {
-  // 关键修复：错误时**不**回到登录表单（避免用户重新输入密码），而是
-  // 保留 loadingBox 状态显示具体错误和重试按钮。所有错误都用 escapeHtml 防 XSS。
-  const spinner = loadingBox.querySelector('.spinner');
-  if (spinner) spinner.style.display = 'none';
-  if (progressBar) progressBar.style.display = 'none';
-  statusEl.innerHTML = '<span style="color:#c62828">' + escapeHtml(msg) + '</span>';
-  const btn = document.getElementById('reopenBtn');
-  if (btn) {
-    btn.textContent = '重新登录';
-    btn.onclick = function() { location.reload(); };
-    btn.style.display = 'inline-block';
-    btn.classList.add('show');
-  }
-}
-
-async function doLogin() {
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
-  if (!username || !password) {
-    loginError.textContent = '请输入账号和密码';
-    return;
-  }
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true;
-  btn.textContent = '登录中...';
-  loginError.textContent = '';
-
-  // 直接进入 loading 状态：所有错误和重试都显示在 loadingBox，不再回到 loginForm
-  showLoading();
-  statusEl.textContent = '正在获取看板地址...';
-
-  // 1. 获取 tunnel 地址（8 秒超时）
-  let tunnelUrl;
+async function enterBoard() {
   try {
     const r = await fetchWithTimeout(TUNNEL_URL_TXT, null, 8000);
-    tunnelUrl = (await r.text()).trim();
+    const url = (await r.text()).trim();
+    if (!url || url === 'INIT' || !/^https?:\/\//.test(url)) throw new Error('看板地址暂不可用');
+    const base = url.replace(/\/$/, '');
+    // 直接在当前标签跳转看板；window.location.href 为同步导航，不会被浏览器弹窗拦截
+    window.location.href = base + '/progress';
   } catch (e) {
-    showErrorAndRetry('获取看板地址失败：' + (e.message || '网络错误'));
-    btn.disabled = false; btn.textContent = '登 录';
-    return;
+    showError('无法进入看板：' + (e.message || '网络错误'));
   }
-  if (!tunnelUrl || tunnelUrl === 'INIT' || !/^https?:\/\//.test(tunnelUrl)) {
-    showErrorAndRetry('看板地址暂不可用，请稍后重试');
-    btn.disabled = false; btn.textContent = '登 录';
-    return;
-  }
-
-  // 2. 到看板服务端验证账号密码（15 秒超时）
-  statusEl.textContent = '正在验证身份...';
-  let authData;
-  try {
-    const authResp = await fetchWithTimeout(
-      tunnelUrl.replace(/\/$/, '') + '/api/auth',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      },
-      15000
-    );
-    authData = await authResp.json();
-  } catch (e) {
-    showErrorAndRetry('验证身份失败：' + (e.message || '网络错误'));
-    btn.disabled = false; btn.textContent = '登 录';
-    return;
-  }
-  if (!authData.ok || !authData.token) {
-    showErrorAndRetry(authData.error || '账号或密码错误');
-    btn.disabled = false; btn.textContent = '登 录';
-    return;
-  }
-
-  // 3. 保存 token（24 小时有效）
-  localStorage.setItem(TOKEN_KEY, JSON.stringify({
-    token: authData.token,
-    expires: Date.now() + 24 * 60 * 60 * 1000,
-    role: authData.role || 'user'
-  }));
-
-  // 4. 打开看板：在新标签页打开，保留本固定入口页
-  currentToken = authData.token;
-  openBoard(authData.token, tunnelUrl);
 }
 
-function openBoard(token, tunnelUrl) {
-  if (!tunnelUrl) {
-    statusEl.innerHTML = '正在获取最新看板地址...';
-    if (progressBar) progressBar.style.display = 'block';
-    fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
-      .then(r => r.text())
-      .then(url => openBoard(token, url.trim()))
-      .catch(() => showError('无法获取看板地址，请刷新重试'));
-    return;
-  }
-  const base = tunnelUrl.replace(/\/$/, '');
-  const url = base + '/login?token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('/progress');
-  currentTunnelBase = base;
-  currentToken = token;
-
-  statusEl.innerHTML = '<span style="color:#2e7d32">登录成功，正在进入看板...</span>';
-  showLoading();
-
-  // 关键修复：直接在当前标签跳转，避免 window.open 被浏览器拦截导致卡在登录页
-  // /login?token=... 会在服务端写入 HttpOnly+Secure cookie，再 302 到 /progress
-  window.location.href = url;
-}
-
-function reopenBoard() {
-  if (!currentToken) { location.reload(); return; }
-  const btn = document.getElementById('reopenBtn');
-  if (btn) { btn.classList.remove('show'); }
-  statusEl.innerHTML = '<span style="color:#2e7d32">正在打开看板...</span>';
-  showLoading();
-  // 始终重新拉取最新地址（隧道可能已重连换地址），避免用到过期地址导致打不开
-  fetch(TUNNEL_URL_TXT, { cache: 'no-store' })
-    .then(r => r.text())
-    .then(url => {
-      const u = (url || '').trim();
-      if (!u || u === 'INIT' || !/^https?:\/\//.test(u)) throw new Error('看板地址暂不可用');
-      openBoard(currentToken, u);
-    })
-    .catch(() => showError('无法获取看板地址，请刷新重试'));
-}
-
-// 回车提交
-['username','password'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLogin();
-  });
-});
+enterBoard();
 </script>
 </body>
 </html>
